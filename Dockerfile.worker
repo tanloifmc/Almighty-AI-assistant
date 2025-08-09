@@ -1,0 +1,27 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY background_worker.py ./
+COPY workflow_manager.py ./
+COPY event_system.py ./
+COPY scheduler.py ./
+COPY core_agent.py ./
+COPY tools.py ./
+COPY app_connector.py ./
+COPY config.json ./
+
+# Run the background services
+CMD ["python", "start_background_services.py"]
+

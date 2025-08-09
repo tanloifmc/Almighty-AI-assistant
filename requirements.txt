@@ -1,0 +1,10 @@
+Flask
+Flask-Cors
+langchain
+langchain-google-genai
+python-dotenv
+redis
+celery
+APScheduler
+
+

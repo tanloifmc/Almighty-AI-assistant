@@ -1,0 +1,205 @@
+version: '3.8'
+
+services:
+  # Redis Service
+  redis:
+    image: redis:7-alpine
+    container_name: almighty-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Backend API Service
+  backend-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: almighty-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - FLASK_ENV=production
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+    volumes:
+      - ./logs:/app/logs
+
+  # Multilingual API Service
+  multilingual-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.multilingual
+    container_name: almighty-multilingual
+    ports:
+      - "5001:5001"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Voice API Service
+  voice-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.voice
+    container_name: almighty-voice
+    ports:
+      - "5002:5002"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+    volumes:
+      - ./audio_cache:/app/audio_cache
+
+  # Collaboration API Service
+  collaboration-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.collaboration
+    container_name: almighty-collaboration
+    ports:
+      - "5003:5003"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Analytics API Service
+  analytics-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.analytics
+    container_name: almighty-analytics
+    ports:
+      - "5004:5004"
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Custom AI Training API Service
+  training-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.training
+    container_name: almighty-training
+    ports:
+      - "5005:5005"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Background Worker Service
+  background-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: almighty-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Frontend Web App
+  frontend:
+    build:
+      context: ./ai-assistant-ui
+      dockerfile: Dockerfile
+    container_name: almighty-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:5000
+      - REACT_APP_MULTILINGUAL_API_URL=http://localhost:5001
+      - REACT_APP_VOICE_API_URL=http://localhost:5002
+      - REACT_APP_COLLABORATION_API_URL=http://localhost:5003
+      - REACT_APP_ANALYTICS_API_URL=http://localhost:5004
+      - REACT_APP_TRAINING_API_URL=http://localhost:5005
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Mobile Web App
+  mobile-app:
+    build:
+      context: ./ai-assistant-mobile
+      dockerfile: Dockerfile
+    container_name: almighty-mobile
+    ports:
+      - "3001:3000"
+    environment:
+      - REACT_APP_API_BASE_URL=http://localhost:5000
+      - REACT_APP_MULTILINGUAL_API_URL=http://localhost:5001
+      - REACT_APP_VOICE_API_URL=http://localhost:5002
+      - REACT_APP_COLLABORATION_API_URL=http://localhost:5003
+      - REACT_APP_ANALYTICS_API_URL=http://localhost:5004
+      - REACT_APP_TRAINING_API_URL=http://localhost:5005
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: almighty-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - mobile-app
+      - backend-api
+      - multilingual-api
+      - voice-api
+      - collaboration-api
+      - analytics-api
+      - training-api
+    restart: unless-stopped
+    networks:
+      - almighty-network
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  almighty-network:
+    driver: bridge
+
